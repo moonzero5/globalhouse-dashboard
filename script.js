@@ -218,6 +218,51 @@ document.addEventListener("DOMContentLoaded", () => {
     initGoogleSheetSync();
 });
 
+// ======== Helper: Populate Month Dropdown Dynamically Based on Year ========
+function updateMonthDropdownOptions(selectedYear, selectEl, includeAllOption = true) {
+    if (!selectEl) return;
+    const currentVal = parseInt(selectEl.value, 10);
+    
+    // Determine max available month for the chosen year
+    let maxM = 12;
+    if (selectedYear) {
+        const monthsInYear = allData
+            .filter(d => parseInt(d.year) === parseInt(selectedYear))
+            .map(d => parseInt(d.month));
+        if (monthsInYear.length > 0) {
+            maxM = Math.max(...monthsInYear);
+        }
+    } else if (allData.length > 0) {
+        // If "all years", find max month across latest year
+        const latestYear = Math.max(...allData.map(d => parseInt(d.year)));
+        const monthsInLatest = allData.filter(d => parseInt(d.year) === latestYear).map(d => parseInt(d.month));
+        if (monthsInLatest.length > 0) maxM = Math.max(...monthsInLatest);
+    }
+
+    selectEl.innerHTML = "";
+    if (includeAllOption) {
+        const allOpt = document.createElement("option");
+        allOpt.value = "";
+        allOpt.textContent = "ทุกเดือน (ทั้งปี)";
+        selectEl.appendChild(allOpt);
+    }
+
+    for (let m = 1; m <= maxM; m++) {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = THAI_MONTHS[m - 1];
+        if (m === currentVal) opt.selected = true;
+        selectEl.appendChild(opt);
+    }
+
+    // If previously selected month exceeds max available, select max available month
+    if (currentVal && currentVal > maxM) {
+        selectEl.value = maxM;
+    } else if (!selectEl.value && !includeAllOption && maxM > 0) {
+        selectEl.value = maxM;
+    }
+}
+
 // ======== Dynamic Filter Initialization ========
 function initFilterOptions() {
     const yearSelect = document.getElementById("filterYear");
@@ -226,7 +271,7 @@ function initFilterOptions() {
     const statusSelect = document.getElementById("filterStatus");
 
     // Extract unique values
-    const years = [...new Set(allData.map(d => d.year).filter(Boolean))].sort((a, b) => b - a);
+    const years = [...new Set(allData.map(d => parseInt(d.year)).filter(Boolean))].sort((a, b) => b - a);
     const branches = [...new Set(allData.map(d => d.branch).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th"));
     const statuses = [...new Set(allData.map(d => d.status).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th"));
 
@@ -240,21 +285,15 @@ function initFilterOptions() {
         yearSelect.appendChild(opt);
     });
 
-    // Populate Month Dropdown
-    monthSelect.innerHTML = '<option value="">ทุกเดือน (ทั้งปี)</option>';
-    THAI_MONTHS.forEach((mName, idx) => {
-        const opt = document.createElement("option");
-        opt.value = idx + 1;
-        opt.textContent = mName;
-        monthSelect.appendChild(opt);
-    });
+    const latestYear = years[0] || new Date().getFullYear();
 
-    // Default: Select latest available month of latest year
-    const latestYear = years[0];
-    const monthsInLatestYear = allData.filter(d => d.year === latestYear).map(d => d.month);
+    // Populate Month Dropdown dynamically based on latest year
+    updateMonthDropdownOptions(latestYear, monthSelect, true);
+    
+    // Select latest available month by default
+    const monthsInLatestYear = allData.filter(d => parseInt(d.year) === parseInt(latestYear)).map(d => parseInt(d.month));
     if (monthsInLatestYear.length > 0) {
-        const maxMonth = Math.max(...monthsInLatestYear);
-        monthSelect.value = maxMonth;
+        monthSelect.value = Math.max(...monthsInLatestYear);
     }
 
     // Populate Branches
@@ -287,16 +326,7 @@ function initFilterOptions() {
             momSelectYear.appendChild(opt);
         });
         momSelectYear.value = latestYear;
-
-        momSelectMonth.innerHTML = "";
-        THAI_MONTHS.forEach((mName, idx) => {
-            const opt = document.createElement("option");
-            opt.value = idx + 1;
-            opt.textContent = mName;
-            momSelectMonth.appendChild(opt);
-        });
-        const initialMonth = monthSelect.value || 1;
-        momSelectMonth.value = initialMonth;
+        updateMonthDropdownOptions(latestYear, momSelectMonth, false);
     }
 
     // Populate YoY Section Selectors
@@ -311,33 +341,47 @@ function initFilterOptions() {
             yoySelectYear.appendChild(opt);
         });
         yoySelectYear.value = latestYear;
-
-        yoySelectMonth.innerHTML = "";
-        THAI_MONTHS.forEach((mName, idx) => {
-            const opt = document.createElement("option");
-            opt.value = idx + 1;
-            opt.textContent = mName;
-            yoySelectMonth.appendChild(opt);
-        });
-        const initialMonth = monthSelect.value || 1;
-        yoySelectMonth.value = initialMonth;
+        updateMonthDropdownOptions(latestYear, yoySelectMonth, false);
     }
 }
 
 function onMomSelectorChange() {
+    const momSelectYear = document.getElementById("momSelectYear");
+    const momSelectMonth = document.getElementById("momSelectMonth");
+    if (momSelectYear && momSelectMonth) {
+        updateMonthDropdownOptions(momSelectYear.value, momSelectMonth, false);
+    }
     renderMomComparison();
 }
 
 function onYoySelectorChange() {
+    const yoySelectYear = document.getElementById("yoySelectYear");
+    const yoySelectMonth = document.getElementById("yoySelectMonth");
+    if (yoySelectYear && yoySelectMonth) {
+        updateMonthDropdownOptions(yoySelectYear.value, yoySelectMonth, false);
+    }
     renderYoyComparison();
 }
 
 function setupEventListeners() {
-    const filterIds = ["filterYear", "filterMonth", "filterBranch", "filterStatus"];
-    filterIds.forEach(id => {
-        document.getElementById(id).addEventListener("change", () => {
+    const yearEl = document.getElementById("filterYear");
+    const monthEl = document.getElementById("filterMonth");
+
+    if (yearEl && monthEl) {
+        yearEl.addEventListener("change", () => {
+            updateMonthDropdownOptions(yearEl.value, monthEl, true);
             updateDashboard();
         });
+    }
+
+    const filterIds = ["filterMonth", "filterBranch", "filterStatus"];
+    filterIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("change", () => {
+                updateDashboard();
+            });
+        }
     });
 
     // Drag & drop for import modal

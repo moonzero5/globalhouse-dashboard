@@ -658,7 +658,7 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
 
     const getSubset = (yr, mo) => {
         return allData.filter(d => {
-            if (d.year !== yr || d.month !== mo) return false;
+            if (parseInt(d.year) !== parseInt(yr) || parseInt(d.month) !== parseInt(mo)) return false;
             if (selectedBranch && d.branch !== selectedBranch) return false;
             if (selectedStatus && d.status !== selectedStatus) return false;
             return true;
@@ -670,20 +670,11 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
     let totalPending = 0;
     let totalVal = 0;
 
-<<<<<<< HEAD
     // Show only up to the last month that has actual data for this year
     const monthsWithData = allData
         .filter(d => parseInt(d.year) === parseInt(year))
-        .map(d => d.month);
+        .map(d => parseInt(d.month));
     const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
-=======
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    // For the current year: only show months up to current month
-    // For past years: show all 12 months
-    const maxMonth = (parseInt(year) === currentYear) ? currentMonth : 12;
->>>>>>> de4bc73d2a18fd14b2b28e876d953bbb6c73d10a
 
     for (let m = 1; m <= maxMonth; m++) {
         const curSubset = getSubset(year, m);
@@ -1078,14 +1069,14 @@ function setYearRange(range, btn) {
 }
 
 function renderYearlyComparison(selectedBranch, selectedStatus) {
-    let years = [...new Set(allData.map(d => d.year).filter(Boolean))].sort((a, b) => a - b);
+    let years = [...new Set(allData.map(d => parseInt(d.year)).filter(Boolean))].sort((a, b) => a - b);
     if (currentYearRange > 0 && years.length > currentYearRange) {
         years = years.slice(years.length - currentYearRange);
     }
 
     const yearlyData = years.map(yr => {
         const subset = allData.filter(d => {
-            if (d.year !== yr) return false;
+            if (parseInt(d.year) !== parseInt(yr)) return false;
             if (selectedBranch && d.branch !== selectedBranch) return false;
             if (selectedStatus && d.status !== selectedStatus) return false;
             return true;

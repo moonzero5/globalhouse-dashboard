@@ -670,11 +670,20 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
     let totalPending = 0;
     let totalVal = 0;
 
+<<<<<<< HEAD
     // Show only up to the last month that has actual data for this year
     const monthsWithData = allData
         .filter(d => parseInt(d.year) === parseInt(year))
         .map(d => d.month);
     const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
+=======
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    // For the current year: only show months up to current month
+    // For past years: show all 12 months
+    const maxMonth = (parseInt(year) === currentYear) ? currentMonth : 12;
+>>>>>>> de4bc73d2a18fd14b2b28e876d953bbb6c73d10a
 
     for (let m = 1; m <= maxMonth; m++) {
         const curSubset = getSubset(year, m);

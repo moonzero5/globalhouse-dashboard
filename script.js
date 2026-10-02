@@ -670,7 +670,14 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
     let totalPending = 0;
     let totalVal = 0;
 
-    for (let m = 1; m <= 12; m++) {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    // For the current year: only show months up to current month
+    // For past years: show all 12 months
+    const maxMonth = (year === currentYear) ? currentMonth : 12;
+
+    for (let m = 1; m <= maxMonth; m++) {
         const curSubset = getSubset(year, m);
         const curJobs = curSubset.length;
         const curVal = curSubset.reduce((s, d) => s + (Number(d.value) || 0), 0);

@@ -756,14 +756,19 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
 function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
     const year = selectedYear || (allData.length > 0 ? Math.max(...allData.map(d => d.year)) : new Date().getFullYear());
 
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const maxMonth = (parseInt(year) === currentYear) ? currentMonth : 12;
+
     const getMonthlyData = () => {
         const jobs = [];
         const completedJobs = [];
         const pendingJobs = [];
         const values = [];
-        for (let m = 1; m <= 12; m++) {
+        for (let m = 1; m <= maxMonth; m++) {
             const subset = allData.filter(d => {
-                if (d.year !== year || d.month !== m) return false;
+                if (parseInt(d.year) !== parseInt(year) || d.month !== m) return false;
                 if (selectedBranch && d.branch !== selectedBranch) return false;
                 if (selectedStatus && d.status !== selectedStatus) return false;
                 return true;
@@ -792,7 +797,7 @@ function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
     charts.monthlyJobs = new Chart(ctxJobs, {
         type: "bar",
         data: {
-            labels: THAI_MONTHS_SHORT,
+            labels: THAI_MONTHS_SHORT.slice(0, maxMonth),
             datasets: [
                 {
                     label: `ปิดงานแล้ว (เสร็จสิ้น)`,
@@ -847,7 +852,7 @@ function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
     charts.monthlyValue = new Chart(ctxVal, {
         type: "bar",
         data: {
-            labels: THAI_MONTHS_SHORT,
+            labels: THAI_MONTHS_SHORT.slice(0, maxMonth),
             datasets: [{
                 label: `มูลค่างาน (บาท) ปี ${year}`,
                 data: data.values,

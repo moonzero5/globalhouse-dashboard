@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global House - Repair Work Dashboard (ระบบปรับอากาศ)</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+    <!-- ======== Header ======== -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-title-row">
+                <div>
+                    <h1>Global House</h1>
+                    <h2>Repair Work Dashboard (ระบบปรับอากาศ)</h2>
+                    <p class="header-subtitle">ระบบติดตาม วิเคราะห์มูลค่างาน และสถานะการปิดงานแจ้งซ่อม AESCON</p>
+                </div>
+                <div class="header-sync-status">
+                    <div class="sync-indicator" id="syncIndicator">
+                        <span class="sync-dot" id="syncDot"></span>
+                        <span id="syncStatusText">ข้อมูลในระบบ (ออฟไลน์)</span>
+                    </div>
+                    <div class="sync-time" id="syncTimeText">ข้อมูลเริ่มต้น 983 รายการ</div>
+                    <div class="sync-header-actions">
+                        <button class="btn-header-sync" id="btnHeaderSync" onclick="syncGoogleSheet()" title="ดึงข้อมูลล่าสุดทันที">
+                            🔄 <span class="sync-btn-text">Sync สด</span>
+                        </button>
+                        <button class="btn-header-config" onclick="openSheetConfigModal()" title="ตั้งค่าเชื่อมต่อ Google Sheet">
+                            ⚙️ ตั้งค่าชีต
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- ======== Filter Section ======== -->
+        <section class="filter-section card">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label for="filterYear">ปี</label>
+                    <select id="filterYear"><option value="">ทั้งหมด</option></select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterMonth">เดือน</label>
+                    <select id="filterMonth"><option value="">ทั้งหมด</option></select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterBranch">สาขา</label>
+                    <select id="filterBranch"><option value="">ทั้งหมด</option></select>
+                </div>
+                <div class="filter-group">
+                    <label for="filterStatus">สถานะงาน</label>
+                    <select id="filterStatus"><option value="">ทั้งหมด</option></select>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button id="btnSyncAction" class="btn btn-sync" onclick="syncGoogleSheet()">🔄 ดึงข้อมูลสด Google Sheet</button>
+                <button id="btnConfigAction" class="btn btn-secondary" onclick="openSheetConfigModal()">⚙️ ตั้งค่า Real-time</button>
+                <button id="btnReset" class="btn btn-secondary" onclick="resetFilters()">🔄 รีเซ็ตตัวกรอง</button>
+                <button id="btnImport" class="btn btn-primary" onclick="openImportModal()">📥 Import ไฟล์</button>
+                <button id="btnExport" class="btn btn-success" onclick="exportData()">📤 Export ข้อมูล</button>
+            </div>
+        </section>
+
+        <!-- ======== KPI Cards ======== -->
+        <section class="kpi-section">
+            <div class="kpi-grid">
+                <!-- Card 1: จำนวนงานแจ้งซ่อมทั้งหมด -->
+                <div class="kpi-card">
+                    <div class="kpi-icon">📋</div>
+                    <div class="kpi-title" id="kpiLabel1">งานแจ้งซ่อมทั้งหมด</div>
+                    <div class="kpi-value" id="kpiJobCount">0</div>
+                    <div class="kpi-unit">งาน</div>
+                </div>
+                <!-- Card 2: ปิดงานแล้ว (เสร็จสิ้น) -->
+                <div class="kpi-card kpi-success">
+                    <div class="kpi-icon">✅</div>
+                    <div class="kpi-title" id="kpiLabelCompleted">ปิดงานแล้ว (เสร็จสิ้น)</div>
+                    <div class="kpi-value text-success" id="kpiCompletedCount">0</div>
+                    <div class="kpi-percent text-success" id="kpiCompletedRate">0% สำเร็จ</div>
+                </div>
+                <!-- Card 3: สาขาคงค้าง -->
+                <div class="kpi-card kpi-warning">
+                    <div class="kpi-icon">⏳</div>
+                    <div class="kpi-title" id="kpiLabelPending">สาขาคงค้าง (รอดำเนินการ)</div>
+                    <div class="kpi-value text-warning" id="kpiPendingCount">0</div>
+                    <div class="kpi-percent text-warning" id="kpiPendingRate">0% คงค้าง</div>
+                </div>
+                <!-- Card 4: มูลค่างานช่วงที่เลือก -->
+                <div class="kpi-card">
+                    <div class="kpi-icon">💰</div>
+                    <div class="kpi-title" id="kpiLabel2">มูลค่างานเดือนนี้</div>
+                    <div class="kpi-value" id="kpiMonthValue">0</div>
+                    <div class="kpi-unit">บาท</div>
+                </div>
+                <!-- Card 5: เปรียบเทียบเดือนก่อน -->
+                <div class="kpi-card" id="kpiMomCard">
+                    <div class="kpi-icon">📊</div>
+                    <div class="kpi-title">เปรียบเทียบเดือนก่อน</div>
+                    <div class="kpi-change" id="kpiMomChange">-</div>
+                    <div class="kpi-percent" id="kpiMomPercent">-</div>
+                </div>
+                <!-- Card 6: มูลค่างานรวมทั้งปี -->
+                <div class="kpi-card">
+                    <div class="kpi-icon">🏦</div>
+                    <div class="kpi-title" id="kpiLabel5">มูลค่างานรวมทั้งปี</div>
+                    <div class="kpi-value" id="kpiYearTotal">0</div>
+                    <div class="kpi-unit">บาท</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======== Status Breakdown Section (AESCON สถานะงาน) ======== -->
+        <section class="section card">
+            <h3 class="section-title">📌 สรุปสถานะงานแจ้งซ่อม AESCON (ปิดงานแล้ว vs คงค้าง) <span id="statusYearLabel"></span></h3>
+            <div class="status-summary-grid">
+                <!-- Group 1: ปิดงานแล้ว -->
+                <div class="status-group-card status-group-completed">
+                    <div class="status-group-header">
+                        <span class="status-group-badge badge-completed">✅ ปิดงานแล้ว (เสร็จสิ้น)</span>
+                        <span class="status-group-total" id="statusCompletedTotal">0 งาน</span>
+                    </div>
+                    <div class="status-items-list" id="statusCompletedList">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+
+                <!-- Group 2: สาขาคงค้าง -->
+                <div class="status-group-card status-group-pending">
+                    <div class="status-group-header">
+                        <span class="status-group-badge badge-pending">⏳ สาขาคงค้าง (รอดำเนินการ)</span>
+                        <span class="status-group-total" id="statusPendingTotal">0 งาน</span>
+                    </div>
+                    <div class="status-items-list" id="statusPendingList">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+
+                <!-- Group 3: Chart & Progress -->
+                <div class="status-chart-card">
+                    <h4 class="status-chart-title">สัดส่วนสถานะการดำเนินงาน</h4>
+                    <div class="status-chart-wrapper">
+                        <canvas id="statusDonutChart"></canvas>
+                    </div>
+                    <div class="status-legend-summary" id="statusProgressSummary">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======== Monthly Summary Table ======== -->
+        <section class="section card">
+            <h3 class="section-title">📊 ตารางสรุปรายเดือน <span id="summaryYearLabel"></span></h3>
+            <div class="table-responsive">
+                <table class="data-table summary-table">
+                    <thead>
+                        <tr>
+                            <th>เดือน</th>
+                            <th>จำนวนงานทั้งหมด</th>
+                            <th>ปิดงานแล้ว</th>
+                            <th>สาขาคงค้าง</th>
+                            <th>% สำเร็จ</th>
+                            <th>มูลค่างาน (บาท)</th>
+                            <th>เดือนก่อนหน้า (บาท)</th>
+                            <th>% เปลี่ยนแปลง</th>
+                            <th>เดือนเดียวกันปีก่อน (บาท)</th>
+                            <th>% YoY</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monthlySummaryBody"></tbody>
+                    <tfoot id="monthlySummaryFoot"></tfoot>
+                </table>
+            </div>
+        </section>
+
+        <!-- ======== Charts: Monthly Jobs & Value ======== -->
+        <section class="charts-row">
+            <div class="section card chart-card">
+                <h3 class="section-title">📈 จำนวนงานแจ้งซ่อมรายเดือน (แยกตามสถานะ)</h3>
+                <div class="chart-wrapper"><canvas id="monthlyJobsChart"></canvas></div>
+            </div>
+            <div class="section card chart-card">
+                <h3 class="section-title">💰 มูลค่างานรายเดือน (บาท)</h3>
+                <div class="chart-wrapper"><canvas id="monthlyValueChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ======== MoM Comparison ======== -->
+        <section class="section card">
+            <div class="section-header-flex">
+                <h3 class="section-title" style="margin-bottom:0;">📊 มูลค่างานเดือนปัจจุบัน vs เดือนก่อนหน้า</h3>
+                <div class="inline-select-group">
+                    <label for="momSelectYear">ปี:</label>
+                    <select id="momSelectYear" class="select-sm" onchange="onMomSelectorChange()"></select>
+                    <label for="momSelectMonth">เดือน:</label>
+                    <select id="momSelectMonth" class="select-sm" onchange="onMomSelectorChange()"></select>
+                </div>
+            </div>
+            <div class="comparison-grid">
+                <div class="comparison-details">
+                    <div class="compare-box">
+                        <div class="compare-label" id="momPrevLabel">เดือนก่อน</div>
+                        <div class="compare-value" id="momPrevValue">-</div>
+                        <div class="compare-unit">บาท</div>
+                    </div>
+                    <div class="compare-arrow">→</div>
+                    <div class="compare-box highlight">
+                        <div class="compare-label" id="momCurrLabel">เดือนนี้</div>
+                        <div class="compare-value" id="momCurrValue">-</div>
+                        <div class="compare-unit">บาท</div>
+                    </div>
+                    <div class="compare-arrow">=</div>
+                    <div class="compare-box result" id="momResultBox">
+                        <div class="compare-label">เปลี่ยนแปลง</div>
+                        <div class="compare-value" id="momDiffValue">-</div>
+                        <div class="compare-percent" id="momDiffPercent">-</div>
+                    </div>
+                </div>
+                <div class="chart-wrapper-small"><canvas id="momChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ======== YoY Comparison ======== -->
+        <section class="section card">
+            <div class="section-header-flex">
+                <h3 class="section-title" style="margin-bottom:0;">📊 เปรียบเทียบเดือนเดียวกัน YoY</h3>
+                <div class="inline-select-group">
+                    <label for="yoySelectYear">ปี:</label>
+                    <select id="yoySelectYear" class="select-sm" onchange="onYoySelectorChange()"></select>
+                    <label for="yoySelectMonth">เดือน:</label>
+                    <select id="yoySelectMonth" class="select-sm" onchange="onYoySelectorChange()"></select>
+                </div>
+            </div>
+            <div class="comparison-grid">
+                <div class="comparison-details">
+                    <div class="compare-box">
+                        <div class="compare-label" id="yoyPrevLabel">ปีก่อน</div>
+                        <div class="compare-value" id="yoyPrevValue">-</div>
+                        <div class="compare-unit">บาท</div>
+                    </div>
+                    <div class="compare-arrow">→</div>
+                    <div class="compare-box highlight">
+                        <div class="compare-label" id="yoyCurrLabel">ปีนี้</div>
+                        <div class="compare-value" id="yoyCurrValue">-</div>
+                        <div class="compare-unit">บาท</div>
+                    </div>
+                    <div class="compare-arrow">=</div>
+                    <div class="compare-box result" id="yoyResultBox">
+                        <div class="compare-label">เปลี่ยนแปลง</div>
+                        <div class="compare-value" id="yoyDiffValue">-</div>
+                        <div class="compare-percent" id="yoyDiffPercent">-</div>
+                    </div>
+                </div>
+                <div class="chart-wrapper-small"><canvas id="yoyChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ======== Yearly Comparison ======== -->
+        <section class="section card">
+            <h3 class="section-title">📊 เปรียบเทียบข้อมูลและสถานะรายปี</h3>
+            <div class="yearly-controls">
+                <button class="btn btn-sm active" onclick="setYearRange(3, this)">3 ปี</button>
+                <button class="btn btn-sm" onclick="setYearRange(5, this)">5 ปี</button>
+                <button class="btn btn-sm" onclick="setYearRange(0, this)">ทั้งหมด</button>
+            </div>
+            <div class="table-responsive" id="yearlyTableContainer"></div>
+            <p class="trend-summary" id="yearlyTrendSummary"></p>
+            <div class="chart-wrapper"><canvas id="yearlyChart"></canvas></div>
+        </section>
+
+    </main>
+
+    <!-- ======== Import Modal ======== -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📥 Import ข้อมูล (ชีต ปรับอากาศ)</h3>
+                <button class="modal-close" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>รองรับไฟล์ <strong>CSV</strong> และ <strong>Excel (.xlsx, .xls)</strong> จากชีต <strong>ปรับอากาศ</strong></p>
+                <p class="modal-hint">ระบบจะอ่านข้อมูลจาก: Col A (เลขที่เอกสาร), Col E (สาขา), Col F (วันที่แจ้ง), Col G (ปี), Col Q (สถานะ AESCON), Col T (มูลค่า ไม่รวม VAT 7%)</p>
+                <div class="file-drop-zone" id="dropZone">
+                    <p>📁 ลากไฟล์มาวางที่นี่<br>หรือ <strong>คลิกเพื่อเลือกไฟล์</strong></p>
+                    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none">
+                </div>
+                <div class="import-options">
+                    <label><input type="radio" name="importMode" value="replace" checked> แทนที่ข้อมูลเดิม</label>
+                    <label><input type="radio" name="importMode" value="append"> เพิ่มข้อมูลต่อท้าย</label>
+                </div>
+                <div id="importStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== Google Sheet Real-time Config Modal ======== -->
+    <div class="modal-overlay" id="sheetConfigModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3>⚙️ ตั้งค่าเชื่อมต่อ Google Sheet แบบ Real-time</h3>
+                <button class="modal-close" onclick="closeSheetConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group mb-3">
+                    <label for="cfgSheetUrl" style="font-weight:600; display:block; margin-bottom:6px;">
+                        🔗 ลิงก์ Google Sheet หรือ Sheet ID:
+                    </label>
+                    <input type="text" id="cfgSheetUrl" class="form-input" 
+                           placeholder="เช่น https://docs.google.com/spreadsheets/d/1.../edit#gid=1361001811"
+                           style="width:100%; padding:10px 12px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.9rem;">
+                    <span class="modal-hint">วางลิงก์ Google Sheet ตัวเต็มจากหน้าเว็บเบราว์เซอร์ได้เลย ระบบจะดึง Sheet ID และ Tab อัตโนมัติ</span>
+                </div>
+
+                <div class="form-grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                    <div class="form-group">
+                        <label for="cfgSheetTab" style="font-weight:600; display:block; margin-bottom:6px;">
+                            📑 ชื่อแท็บชีต / Tab Name:
+                        </label>
+                        <input type="text" id="cfgSheetTab" class="form-input" value="ปรับอากาศ"
+                               style="width:100%; padding:9px 12px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.9rem;">
+                    </div>
+                    <div class="form-group">
+                        <label for="cfgAutoSync" style="font-weight:600; display:block; margin-bottom:6px;">
+                            ⏱️ ดึงข้อมูลอัตโนมัติ (Auto-Sync):
+                        </label>
+                        <select id="cfgAutoSync" class="form-input" style="width:100%; padding:9px 12px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.9rem; background:#fff;">
+                            <option value="0">ปิด (ดึงด้วยตนเองเมื่อกดปุ่ม)</option>
+                            <option value="60000">ทุก 1 นาที</option>
+                            <option value="300000" selected>ทุก 5 นาที (แนะนำ)</option>
+                            <option value="900000">ทุก 15 นาที</option>
+                            <option value="1800000">ทุก 30 นาที</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="guide-box" style="background:#e8f4fd; border:1px solid #b6e0fe; border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:18px; font-size:0.85rem; color:#0c5460;">
+                    <strong style="color:#084298;">📋 วิธีเปิดสิทธิ์ให้เว็บดึงข้อมูลสดได้:</strong>
+                    <ol style="margin-left:20px; margin-top:6px; line-height:1.6;">
+                        <li>เปิด Google Sheet ไฟล์งานแจ้งซ่อมของคุณ</li>
+                        <li>กดปุ่ม <strong>แชร์ (Share)</strong> มุมขวาบน</li>
+                        <li>ในส่วน "การเข้าถึงทั่วไป (General access)" ให้เปลี่ยนเป็น <strong>"ทุกคนที่มีลิงก์ (Anyone with the link)"</strong> เป็น <strong>"มีสิทธิ์ดู (Viewer)"</strong></li>
+                        <li>คัดลอกลิงก์มาวางในช่องด้านบน แล้วกดปุ่ม <strong>"บันทึก & เชื่อมต่อสด"</strong> ด้านล่าง</li>
+                    </ol>
+                </div>
+
+                <div id="cfgSyncStatus" style="display:none; padding:10px 14px; border-radius:var(--radius-sm); font-size:0.9rem; margin-bottom:16px;"></div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button class="btn btn-secondary" onclick="closeSheetConfigModal()">ยกเลิก</button>
+                    <button class="btn btn-primary" onclick="saveSheetConfigAndSync()">💾 บันทึก & เชื่อมต่อสด</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== Footer ======== -->
+    <footer class="footer">
+        <p>&copy; Global House — Repair Work Dashboard | ระบบติดตามและวิเคราะห์งานแจ้งซ่อมระบบปรับอากาศ</p>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toastNotification" class="toast-notification"></div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

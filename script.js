@@ -675,7 +675,7 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
     const currentMonth = now.getMonth() + 1; // 1-12
     // For the current year: only show months up to current month
     // For past years: show all 12 months
-    const maxMonth = (year === currentYear) ? currentMonth : 12;
+    const maxMonth = (parseInt(year) === currentYear) ? currentMonth : 12;
 
     for (let m = 1; m <= maxMonth; m++) {
         const curSubset = getSubset(year, m);

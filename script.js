@@ -745,7 +745,7 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
             <td>${overallCompRate}</td>
             <td>${formatCurrency(totalVal)}</td>
             <td colspan="4" style="text-align: left; color: var(--text-secondary); font-weight: normal;">
-                (เฉลี่ยเดือนละ ${formatCurrency(totalVal / 12)} บาท / ${formatNumber(Math.round(totalJobs / 12))} งาน)
+                (เฉลี่ยเดือนละ ${formatCurrency(totalVal / (maxMonth || 1))} บาท / ${formatNumber(Math.round(totalJobs / (maxMonth || 1)))} งาน ในช่วง ${maxMonth} เดือน)
             </td>
         </tr>
     `;
@@ -758,7 +758,7 @@ function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
     // Show only up to the last month that has actual data for this year
     const monthsWithData = allData
         .filter(d => parseInt(d.year) === parseInt(year))
-        .map(d => d.month);
+        .map(d => parseInt(d.month));
     const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
 
     const getMonthlyData = () => {
@@ -768,7 +768,7 @@ function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
         const values = [];
         for (let m = 1; m <= maxMonth; m++) {
             const subset = allData.filter(d => {
-                if (parseInt(d.year) !== parseInt(year) || d.month !== m) return false;
+                if (parseInt(d.year) !== parseInt(year) || parseInt(d.month) !== parseInt(m)) return false;
                 if (selectedBranch && d.branch !== selectedBranch) return false;
                 if (selectedStatus && d.status !== selectedStatus) return false;
                 return true;
@@ -914,7 +914,7 @@ function renderMomComparison() {
 
     const getSubset = (yr, mo) => {
         return allData.filter(d => {
-            if (d.year !== yr || d.month !== mo) return false;
+            if (parseInt(d.year) !== parseInt(yr) || parseInt(d.month) !== parseInt(mo)) return false;
             if (selectedBranch && d.branch !== selectedBranch) return false;
             if (selectedStatus && d.status !== selectedStatus) return false;
             return true;
@@ -994,7 +994,7 @@ function renderYoyComparison() {
 
     const getSubset = (yr, mo) => {
         return allData.filter(d => {
-            if (d.year !== yr || d.month !== mo) return false;
+            if (parseInt(d.year) !== parseInt(yr) || parseInt(d.month) !== parseInt(mo)) return false;
             if (selectedBranch && d.branch !== selectedBranch) return false;
             if (selectedStatus && d.status !== selectedStatus) return false;
             return true;

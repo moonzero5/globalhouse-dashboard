@@ -670,12 +670,11 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
     let totalPending = 0;
     let totalVal = 0;
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    // For the current year: only show months up to current month
-    // For past years: show all 12 months
-    const maxMonth = (year === currentYear) ? currentMonth : 12;
+    // Show only up to the last month that has actual data for this year
+    const monthsWithData = allData
+        .filter(d => parseInt(d.year) === parseInt(year))
+        .map(d => d.month);
+    const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
 
     for (let m = 1; m <= maxMonth; m++) {
         const curSubset = getSubset(year, m);
@@ -756,10 +755,11 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
 function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
     const year = selectedYear || (allData.length > 0 ? Math.max(...allData.map(d => d.year)) : new Date().getFullYear());
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    const maxMonth = (parseInt(year) === currentYear) ? currentMonth : 12;
+    // Show only up to the last month that has actual data for this year
+    const monthsWithData = allData
+        .filter(d => parseInt(d.year) === parseInt(year))
+        .map(d => d.month);
+    const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
 
     const getMonthlyData = () => {
         const jobs = [];

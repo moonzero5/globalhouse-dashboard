@@ -176,6 +176,7 @@ function getIndicatorBadge(curr, prev) {
 
 // ======== Live Sync & Real-time State ========
 let autoSyncTimerId = null;
+const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1SYeVP-qJ_Pd8m-o8RLJ4e7iAFMPFowN4Z8YPXsoe_Vs/edit?gid=1361001811#gid=1361001811";
 const DEFAULT_SHEET_TAB = "ปรับอากาศ";
 
 // ======== Helper: Toast Notification ========
@@ -1266,31 +1267,31 @@ function handleFileUpload(file) {
             // Col 16 (Q): สถานะ AESCON
             // Col 19 (T): มูลค่า ไม่รวม VAT 7%
             let colIdx = {
-                docNumber: findColumnIndex(headerRow, ["เลขที่แจ้งซ่อม", "เลขที่เอกสาร", "เลขที่", "docnumber"], 0),
-                workType: findColumnIndex(headerRow, ["ประเภทงาน", "ประเภท", "worktype"], 3),
-                branch: findColumnIndex(headerRow, ["สาขา", "branch"], 4),
-                reportDate: findColumnIndex(headerRow, ["วันที่แจ้งซ่อม", "วันที่แจ้ง", "reportdate"], 5),
-                year: findColumnIndex(headerRow, ["ปีแจ้งซ่อม", "ปี", "year"], 6),
-                status: findColumnIndex(headerRow, ["สถานะ aescon", "สถานะ", "status", "สถานะงาน"], 16),
-                value: findColumnIndex(headerRow, ["มูลค่า ไม่รวม vat 7%", "มูลค่างาน", "มูลค่า", "ราคา", "value"], 19)
+                docNumber: findColumnIndex(headerRow, ["เลขที่แจ้งซ่อม", "เลขที่เอกสาร", "เลขที่", "docnumber", "doc_no"], 0),
+                branch: findColumnIndex(headerRow, ["สาขา", "ชื่อสาขา", "branch"], 4),
+                reportDate: findColumnIndex(headerRow, ["วันที่แจ้งซ่อม", "วันที่แจ้ง", "วันที่", "reportdate"], 5),
+                year: findColumnIndex(headerRow, ["ปีแจ้งซ่อม", "ปีที่แจ้ง", "ปี", "year"], 6),
+                status: findColumnIndex(headerRow, ["สถานะ aescon", "สถานะaescon", "aescon", "สถานะงาน", "สถานะ", "status"], 16),
+                value: findColumnIndex(headerRow, ["มูลค่า ไม่รวม vat 7%", "ไม่รวม vat", "ไม่รวมvat", "มูลค่างาน", "มูลค่า", "ราคา", "value"], 19)
             };
 
             const parsedItems = [];
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length === 0 || !row[colIdx.docNumber]) continue;
+                if (!row || row.length === 0) continue;
 
-                const docNo = String(row[colIdx.docNumber] || "").trim();
-                if (!docNo || !/^\d+$/.test(docNo)) continue;
-
-                // If column workType exists, filter specifically for 'ปรับอากาศ'
-                const wType = String(row[colIdx.workType] || "").trim();
-                if (colIdx.workType !== undefined && wType && !wType.includes("ปรับอากาศ")) {
-                    continue;
-                }
-
+                const branchStr = String(row[colIdx.branch] || "").trim();
                 const rawDate = row[colIdx.reportDate];
                 const rawYear = row[colIdx.year];
+                const rawDesc = String(row[1] || "").trim();
+
+                // Skip truly empty trailing rows
+                if (!branchStr && !rawDate && !rawYear && !rawDesc) continue;
+
+                let docNo = String(row[colIdx.docNumber] !== undefined && row[colIdx.docNumber] !== null ? row[colIdx.docNumber] : (row[0] || "")).trim();
+                if (docNo === "เลขที่แจ้งซ่อม" || docNo === "เลขที่เอกสาร" || docNo === "เลขที่") continue;
+                if (!docNo) docNo = "-";
+
                 const dateInfo = parseDateInfo(rawDate, rawYear);
 
                 let rawVal = row[colIdx.value];
@@ -1306,15 +1307,18 @@ function handleFileUpload(file) {
                     numVal = 379000;
                 }
 
+                let rawStatus = String(row[colIdx.status] || "").trim();
+                if (!rawStatus) rawStatus = "รอประเมินราคาหน้างาน";
+
                 parsedItems.push({
                     docNumber: docNo,
                     reportDate: dateInfo.formattedDate,
                     year: dateInfo.year,
                     month: dateInfo.month,
                     monthName: dateInfo.monthName,
-                    branch: String(row[colIdx.branch] || "ไม่ระบุสาขา").trim(),
+                    branch: branchStr || "ไม่ระบุสาขา",
                     workType: "ปรับอากาศ",
-                    status: String(row[colIdx.status] || "รอประเมินราคาหน้างาน").trim(),
+                    status: rawStatus,
                     value: Math.round(numVal * 100) / 100
                 });
             }
@@ -1397,7 +1401,7 @@ function openSheetConfigModal() {
     if (!modal) return;
     
     // Load saved settings into fields
-    const savedUrl = localStorage.getItem("gh_sheet_url") || "";
+    const savedUrl = localStorage.getItem("gh_sheet_url") || DEFAULT_SHEET_URL;
     const savedTab = localStorage.getItem("gh_sheet_tab") || DEFAULT_SHEET_TAB;
     const savedAuto = localStorage.getItem("gh_auto_sync") || "300000";
 
@@ -1666,11 +1670,18 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
         const row = rows[i];
         if (!row || row.length === 0) continue;
 
-        let docNo = String(row[colIdx.docNumber] !== undefined && row[colIdx.docNumber] !== null ? row[colIdx.docNumber] : (row[0] || "")).trim();
-        if (!docNo || docNo === "เลขที่แจ้งซ่อม" || docNo === "เลขที่เอกสาร" || docNo === "เลขที่") continue;
-
+        const branchStr = String(row[colIdx.branch] || "").trim();
         const rawDate = row[colIdx.reportDate];
         const rawYear = row[colIdx.year];
+        const rawDesc = String(row[1] || "").trim();
+
+        // Skip truly empty trailing rows
+        if (!branchStr && !rawDate && !rawYear && !rawDesc) continue;
+
+        let docNo = String(row[colIdx.docNumber] !== undefined && row[colIdx.docNumber] !== null ? row[colIdx.docNumber] : (row[0] || "")).trim();
+        if (docNo === "เลขที่แจ้งซ่อม" || docNo === "เลขที่เอกสาร" || docNo === "เลขที่") continue;
+        if (!docNo) docNo = "-";
+
         const dateInfo = parseDateInfo(rawDate, rawYear);
 
         let rawVal = row[colIdx.value];
@@ -1695,7 +1706,7 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
             year: dateInfo.year,
             month: dateInfo.month,
             monthName: dateInfo.monthName,
-            branch: String(row[colIdx.branch] || "ไม่ระบุสาขา").trim(),
+            branch: branchStr || "ไม่ระบุสาขา",
             workType: "ปรับอากาศ",
             status: rawStatus,
             value: Math.round(numVal * 100) / 100

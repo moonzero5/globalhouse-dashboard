@@ -71,10 +71,11 @@ function parseDateInfo(dateVal, fallbackYearVal) {
 
             if (p3 > 1000) {
                 year = p3;
-                month = p2 <= 12 ? p2 : p1;
+                // Standard Thai date format: Day / Month / Year
+                month = (p2 >= 1 && p2 <= 12) ? p2 : ((p1 >= 1 && p1 <= 12) ? p1 : 1);
             } else if (p1 > 1000) {
                 year = p1;
-                month = p2;
+                month = (p2 >= 1 && p2 <= 12) ? p2 : 1;
             }
         } else if (partsDash.length === 3) {
             let p1 = parseInt(partsDash[0], 10);
@@ -83,10 +84,10 @@ function parseDateInfo(dateVal, fallbackYearVal) {
 
             if (p1 > 1000) {
                 year = p1;
-                month = p2;
+                month = (p2 >= 1 && p2 <= 12) ? p2 : 1;
             } else if (p3 > 1000) {
                 year = p3;
-                month = p2;
+                month = (p2 >= 1 && p2 <= 12) ? p2 : 1;
             }
         }
     }
@@ -206,7 +207,13 @@ function sanitizeAllData() {
 
 // ======== Init Dashboard ========
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Try to load cached synced data, or fallback to AIRCON_DATA
+    // Purge any stale cache from earlier versions
+    const cacheVersion = localStorage.getItem("gh_cache_version");
+    if (cacheVersion !== "2.5") {
+        localStorage.removeItem("gh_cached_data");
+        localStorage.setItem("gh_cache_version", "2.5");
+    }
+
     const cachedData = localStorage.getItem("gh_cached_data");
     const lastSyncTime = localStorage.getItem("gh_last_sync_time");
 

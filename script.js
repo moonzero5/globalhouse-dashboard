@@ -190,6 +190,20 @@ function showToast(message, type = "info", duration = 3500) {
     }, duration);
 }
 
+// ======== Helper: Sanitize & Re-align All Dates ========
+function sanitizeAllData() {
+    if (!Array.isArray(allData)) return;
+    allData = allData.map(item => {
+        const dInfo = parseDateInfo(item.reportDate, item.year);
+        return {
+            ...item,
+            year: dInfo.year,
+            month: dInfo.month,
+            monthName: dInfo.monthName
+        };
+    });
+}
+
 // ======== Init Dashboard ========
 document.addEventListener("DOMContentLoaded", () => {
     // 1. Try to load cached synced data, or fallback to AIRCON_DATA
@@ -199,12 +213,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cachedData) {
         try {
             allData = JSON.parse(cachedData);
+            // Re-sanitize any cached dates to ensure correct DD/MM/YYYY interpretation
+            sanitizeAllData();
+            localStorage.setItem("gh_cached_data", JSON.stringify(allData));
             updateSyncStatusUI("live", `ข้อมูลสดในแคช (${formatNumber(allData.length)} รายการ)`, lastSyncTime ? `อัปเดตล่าสุด: ${lastSyncTime}` : "");
         } catch (e) {
             allData = (typeof AIRCON_DATA !== "undefined" && Array.isArray(AIRCON_DATA)) ? AIRCON_DATA : [];
+            sanitizeAllData();
         }
     } else if (typeof AIRCON_DATA !== "undefined" && Array.isArray(AIRCON_DATA)) {
         allData = AIRCON_DATA;
+        sanitizeAllData();
         updateSyncStatusUI("offline", "ข้อมูลเริ่มต้น (983 รายการ)", "ยังไม่ได้เชื่อมต่อ Google Sheet สด");
     } else {
         allData = [];

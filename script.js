@@ -1351,10 +1351,14 @@ function handleFileUpload(file) {
 }
 
 function findColumnIndex(headers, possibleNames, defaultIdx) {
-    for (let i = 0; i < headers.length; i++) {
-        const h = headers[i].toLowerCase();
-        for (let name of possibleNames) {
-            if (h.includes(name.toLowerCase())) return i;
+    if (!headers || !Array.isArray(headers)) return defaultIdx;
+    for (let name of possibleNames) {
+        const target = name.toLowerCase().trim();
+        for (let i = 0; i < headers.length; i++) {
+            const h = String(headers[i] || "").toLowerCase().trim();
+            if (h === target || (target.length > 2 && h.includes(target))) {
+                return i;
+            }
         }
     }
     return defaultIdx;
@@ -1649,13 +1653,12 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
     // Col 16 (Q): สถานะ AESCON
     // Col 19 (T): มูลค่า ไม่รวม VAT 7%
     let colIdx = {
-        docNumber: findColumnIndex(headerRow, ["เลขที่แจ้งซ่อม", "เลขที่เอกสาร", "เลขที่", "docnumber"], 0),
-        workType: findColumnIndex(headerRow, ["ประเภทงาน", "ประเภท", "worktype"], 3),
-        branch: findColumnIndex(headerRow, ["สาขา", "branch"], 4),
-        reportDate: findColumnIndex(headerRow, ["วันที่แจ้งซ่อม", "วันที่แจ้ง", "reportdate"], 5),
-        year: findColumnIndex(headerRow, ["ปีแจ้งซ่อม", "ปี", "year"], 6),
-        status: findColumnIndex(headerRow, ["สถานะ aescon", "สถานะ", "status", "สถานะงาน"], 16),
-        value: findColumnIndex(headerRow, ["มูลค่า ไม่รวม vat 7%", "มูลค่างาน", "มูลค่า", "ราคา", "value"], 19)
+        docNumber: findColumnIndex(headerRow, ["เลขที่แจ้งซ่อม", "เลขที่เอกสาร", "เลขที่", "docnumber", "doc_no"], 0),
+        branch: findColumnIndex(headerRow, ["สาขา", "ชื่อสาขา", "branch"], 4),
+        reportDate: findColumnIndex(headerRow, ["วันที่แจ้งซ่อม", "วันที่แจ้ง", "วันที่", "reportdate"], 5),
+        year: findColumnIndex(headerRow, ["ปีแจ้งซ่อม", "ปีที่แจ้ง", "ปี", "year"], 6),
+        status: findColumnIndex(headerRow, ["สถานะ aescon", "สถานะaescon", "aescon", "สถานะงาน", "สถานะ", "status"], 16),
+        value: findColumnIndex(headerRow, ["มูลค่า ไม่รวม vat 7%", "ไม่รวม vat", "ไม่รวมvat", "มูลค่างาน", "มูลค่า", "ราคา", "value"], 19)
     };
 
     const parsedItems = [];
@@ -1663,13 +1666,8 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
         const row = rows[i];
         if (!row || row.length === 0) continue;
 
-        const docNo = String(row[colIdx.docNumber] || "").trim();
-        if (!docNo || !/^\d+$/.test(docNo)) continue;
-
-        const wType = String(row[colIdx.workType] || "").trim();
-        if (colIdx.workType !== undefined && wType && !wType.includes("ปรับอากาศ")) {
-            continue;
-        }
+        let docNo = String(row[colIdx.docNumber] !== undefined && row[colIdx.docNumber] !== null ? row[colIdx.docNumber] : (row[0] || "")).trim();
+        if (!docNo || docNo === "เลขที่แจ้งซ่อม" || docNo === "เลขที่เอกสาร" || docNo === "เลขที่") continue;
 
         const rawDate = row[colIdx.reportDate];
         const rawYear = row[colIdx.year];
@@ -1688,6 +1686,9 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
             numVal = 379000;
         }
 
+        let rawStatus = String(row[colIdx.status] || "").trim();
+        if (!rawStatus) rawStatus = "รอประเมินราคาหน้างาน";
+
         parsedItems.push({
             docNumber: docNo,
             reportDate: dateInfo.formattedDate,
@@ -1696,7 +1697,7 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
             monthName: dateInfo.monthName,
             branch: String(row[colIdx.branch] || "ไม่ระบุสาขา").trim(),
             workType: "ปรับอากาศ",
-            status: String(row[colIdx.status] || "รอประเมินราคาหน้างาน").trim(),
+            status: rawStatus,
             value: Math.round(numVal * 100) / 100
         });
     }
@@ -1736,4 +1737,34 @@ async function fetchAndApplyGoogleSheet(sheetId, tabName, gid) {
     updateDashboard();
     return true;
 }
+
+// ======== Reset to Default Verified Data ========
+function resetToDefaultData() {
+    if (confirm("คุณต้องการล้างการเชื่อมต่อ Google Sheet และกลับไปใช้ข้อมูลมาตรฐานที่ถูกต้อง (983 รายการ) ใช่หรือไม่?")) {
+        // Clear all cached google sheet settings and data
+        localStorage.removeItem("gh_sheet_url");
+        localStorage.removeItem("gh_sheet_tab");
+        localStorage.removeItem("gh_auto_sync");
+        localStorage.removeItem("gh_cached_data");
+        localStorage.removeItem("gh_last_sync_time");
+
+        if (autoSyncTimerId) {
+            clearInterval(autoSyncTimerId);
+            autoSyncTimerId = null;
+        }
+
+        if (typeof AIRCON_DATA !== "undefined" && Array.isArray(AIRCON_DATA)) {
+            allData = [...AIRCON_DATA];
+        } else {
+            allData = [];
+        }
+
+        updateSyncStatusUI("offline", "ข้อมูลเริ่มต้น (983 รายการ)", "ยกเลิกการเชื่อมต่อแล้ว");
+        initFilterOptions();
+        updateDashboard();
+        closeSheetConfigModal();
+        showToast("✅ คืนค่าข้อมูลเริ่มต้นที่ถูกต้องเรียบร้อยแล้ว", "success");
+    }
+}
+
 

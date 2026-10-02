@@ -249,20 +249,18 @@ function updateMonthDropdownOptions(selectedYear, selectEl, includeAllOption = t
     if (!selectEl) return;
     const currentVal = parseInt(selectEl.value, 10);
     
-    // Determine max available month for the chosen year
+    // Determine max available month for the chosen year (Strictly 9 for 2026)
     let maxM = 12;
-    if (selectedYear) {
+    const yr = parseInt(selectedYear || (allData.length > 0 ? Math.max(...allData.map(d => parseInt(d.year))) : 2026));
+    if (yr === 2026) {
+        maxM = 9;
+    } else if (yr) {
         const monthsInYear = allData
-            .filter(d => parseInt(d.year) === parseInt(selectedYear))
+            .filter(d => parseInt(d.year) === yr)
             .map(d => parseInt(d.month));
         if (monthsInYear.length > 0) {
             maxM = Math.max(...monthsInYear);
         }
-    } else if (allData.length > 0) {
-        // If "all years", find max month across latest year
-        const latestYear = Math.max(...allData.map(d => parseInt(d.year)));
-        const monthsInLatest = allData.filter(d => parseInt(d.year) === latestYear).map(d => parseInt(d.month));
-        if (monthsInLatest.length > 0) maxM = Math.max(...monthsInLatest);
     }
 
     selectEl.innerHTML = "";
@@ -740,11 +738,16 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
     let totalPending = 0;
     let totalVal = 0;
 
-    // Show only up to the last month that has actual data for this year
-    const monthsWithData = allData
-        .filter(d => parseInt(d.year) === parseInt(year))
-        .map(d => parseInt(d.month));
-    const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
+    // Show only up to the last month that has actual data for this year (Max 9 for 2026)
+    let maxMonth = 12;
+    if (parseInt(year) === 2026) {
+        maxMonth = 9;
+    } else {
+        const monthsWithData = allData
+            .filter(d => parseInt(d.year) === parseInt(year))
+            .map(d => parseInt(d.month));
+        if (monthsWithData.length > 0) maxMonth = Math.max(...monthsWithData);
+    }
 
     for (let m = 1; m <= maxMonth; m++) {
         const curSubset = getSubset(year, m);
@@ -825,11 +828,16 @@ function renderMonthlySummaryTable(selectedYear, selectedBranch, selectedStatus,
 function renderMonthlyCharts(selectedYear, selectedBranch, selectedStatus) {
     const year = selectedYear || (allData.length > 0 ? Math.max(...allData.map(d => d.year)) : new Date().getFullYear());
 
-    // Show only up to the last month that has actual data for this year
-    const monthsWithData = allData
-        .filter(d => parseInt(d.year) === parseInt(year))
-        .map(d => parseInt(d.month));
-    const maxMonth = monthsWithData.length > 0 ? Math.max(...monthsWithData) : 12;
+    // Show only up to the last month that has actual data for this year (Max 9 for 2026)
+    let maxMonth = 12;
+    if (parseInt(year) === 2026) {
+        maxMonth = 9;
+    } else {
+        const monthsWithData = allData
+            .filter(d => parseInt(d.year) === parseInt(year))
+            .map(d => parseInt(d.month));
+        if (monthsWithData.length > 0) maxMonth = Math.max(...monthsWithData);
+    }
 
     const getMonthlyData = () => {
         const jobs = [];
